@@ -152,5 +152,16 @@ routes.get('/perguntar-ao-gemini', async (req, res)=>{
 
 
 
+routes.get('/health-db', async (req, res) => {
+  try {
+    const sequelize = require('./models').sequelize;
+    await sequelize.authenticate();
+    res.json({ status: 'Conectado ao banco com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 
 module.exports = routes;
