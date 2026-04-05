@@ -97,3 +97,9 @@ Content-Type: application/json
 ###
 
 
+cookie: {
+  secure: process.env.NODE_ENV === 'production', // true em produção
+  httpOnly: true,
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' para cross-site
+  maxAge: 1000 * 60 * 60
+}
