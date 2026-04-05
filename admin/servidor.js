@@ -1,6 +1,15 @@
 const { server } = require('./app');
 const db = require('./models');
 
+async function enableCrypto() {
+  try {
+    await db.sequelize.query('CREATE EXTENSION IF NOT EXISTS pgcrypto;');
+    console.log('✅ Extensão pgcrypto habilitada');
+  } catch (err) {
+    console.error('❌ Erro ao habilitar pgcrypto:', err.message);
+  }
+}
+
 async function syncTables() {
   // Ordem manual das tabelas (respeitando dependências de chaves estrangeiras)
   const order = [
@@ -34,6 +43,12 @@ async function syncTables() {
   console.log('✅ Todas as tabelas sincronizadas com sucesso');
 }
 
+enableCrypto()
+  .then(() => syncTables())
+  .catch(err => {
+    console.error('❌ Falha na configuração do banco de dados:', err.message);
+    process.exit(1);
+  });
 syncTables()
   .then(() => {
     server.listen(process.env.PORT || 3003, "0.0.0.0", () => {
