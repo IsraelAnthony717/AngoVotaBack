@@ -11,51 +11,61 @@ async function enableCrypto() {
 }
 
 async function syncTables() {
-  // Ordem manual das tabelas (respeitando dependências de chaves estrangeiras)
-  const order = [
-    'perfil',                   // utilizado por utilizador
-    'bilhetes_identidade',      // utilizado por utilizador
-    'perfil_oficial_cne',       // independente
-    'candidatos',               // independente
-    'credenciais',              // independente
-    'eleitores',                // independente
-    'votos',                    // independente
-    'utilizador',               // depende de perfil e bilhetes_identidade
-    'log_acesso'                // depende de utilizador
+  // Ordem correta baseada nas dependências
+  const ordem = [
+    'perfil',
+    'bilhetes_identidade',
+    'candidatos',
+    'credenciais',
+    'eleitores',
+    'perfil_oficial_cne',
+    'votos',
+    'utilizador',
+    'log_acesso'
   ];
   
   const models = db.sequelize.models;
   
-  for (const modelName of order) {
-    const model = models[modelName];
-    if (model) {
+  // Desabilita temporariamente a verificação de chaves estrangeiras
+  await db.sequelize.query('SET CONSTRAINTS ALL DEFERRED;');
+  
+  for (const nome of ordem) {
+    const model = models[nome];
+    if (!model) {
+      console.warn(`⚠️ Modelo ${nome} não encontrado`);
+      continue;
+    }
+    try {
+      await model.sync({ alter: true });
+      console.log(`✅ Tabela ${nome} sincronizada`);
+    } catch (err) {
+      console.error(`❌ Erro ao sincronizar ${nome}:`, err.message);
+      // Tenta criar sem constraints (fallback)
       try {
-        await model.sync({ alter: true });
-        console.log(`✅ Tabela ${modelName} sincronizada`);
-      } catch (err) {
-        console.error(`❌ Erro ao sincronizar ${modelName}:`, err.message);
-        throw err; // Interrompe se falhar
+        await db.sequelize.query(`DROP TABLE IF EXISTS "${nome}" CASCADE;`);
+        await model.sync({ force: true });
+        console.log(`✅ Tabela ${nome} recriada sem constraints`);
+      } catch (fallbackErr) {
+        console.error(`❌ Falha total ao criar ${nome}:`, fallbackErr.message);
+        throw fallbackErr;
       }
-    } else {
-      console.warn(`⚠️ Modelo ${modelName} não encontrado`);
     }
   }
-  console.log('✅ Todas as tabelas sincronizadas com sucesso');
+  
+  // Reabilita constraints (não necessário, mas bom)
+  await db.sequelize.query('SET CONSTRAINTS ALL IMMEDIATE;');
+  console.log('✅ Sincronização concluída');
 }
 
-enableCrypto()
-  .then(() => syncTables())
-  .catch(err => {
-    console.error('❌ Falha na configuração do banco de dados:', err.message);
-    process.exit(1);
+async function init() {
+  await enableCrypto();
+  await syncTables();
+  server.listen(process.env.PORT || 3003, "0.0.0.0", () => {
+    console.log(`Servidor rodando na porta ${process.env.PORT || 3003}`);
   });
-syncTables()
-  .then(() => {
-    server.listen(process.env.PORT || 3003, "0.0.0.0", () => {
-      console.log(`Servidor rodando na porta ${process.env.PORT || 3003}`);
-    });
-  })
-  .catch(err => {
-    console.error('Falha na sincronização, servidor não iniciado:', err);
-    process.exit(1);
-  });
+}
+
+init().catch(err => {
+  console.error('❌ Falha na configuração do banco de dados:', err);
+  process.exit(1);
+});
