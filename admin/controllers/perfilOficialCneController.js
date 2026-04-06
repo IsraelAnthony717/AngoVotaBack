@@ -3,64 +3,61 @@ const { perfil_oficial_cne, bilhetes_identidade, sequelize} = require('../models
 //001234567LA001
 
 class PerfilCNE{
-    async buscarPerfil(req, res){
+    async buscarPerfil(req, res) {
+    try {
+        const perfilNumber = 2;
+        const { numeroBI } = req.body;
 
-        try{
-
-            const perfilNumber = 2;
-
-            const { numeroBI } = req.body;
-
-            if(!numeroBI) return res.status(401).json({error: 'Número do bilhete obrigatório'});
-
-            const bilheteVerify = await bilhetes_identidade.findOne({
-             attributes:[
-                [sequelize.fn('pgp_sym_decrypt',
-                     sequelize.col('numero_bi_enc'),
-                     process.env.MinhaChave),
-                     'numero_bi_decriptografado'],
-
-                     'id'
-                  ],
-
-                  where:sequelize.where(sequelize.fn('pgp_sym_decrypt',
-                     sequelize.col('numero_bi_enc'), process.env.MinhaChave),
-                     numeroBI
-                    )
-
-            });
-
-
-
-            if (!bilheteVerify) return res.status(404).json({message: 'Número BI não encontrado'});
-
-            const guardarBI = bilheteVerify.get('numero_bi_decriptografado');
-
-
-
-    
-            const verificar = await perfil_oficial_cne.findOne({where:{numero_bi:numeroBI}});
-
-            if (!verificar) return res.status(404).json({message:'Número não encontrado, CNE'});
-
-            req.session.bi = bilheteVerify.id;
-
-            req.session.biNumber = guardarBI; 
-    
-            req.session.perfilNumber = perfilNumber;
-
-
-                return res.status(200).json(verificar);
-
-        }catch(err){
-
-            console.log(err)
-            return res.status(401).json({message: 'Erro ao buscar os perfis'});
-
+        if (!numeroBI) {
+            return res.status(400).json({ error: 'Número do bilhete obrigatório' });
         }
-        
-        
+
+        // 1. Verifica se o BI existe (descriptografado)
+        const bilheteVerify = await bilhetes_identidade.findOne({
+            attributes: [
+                [sequelize.fn('pgp_sym_decrypt', sequelize.col('numero_bi_enc'), process.env.MinhaChave), 'numero_bi_decriptografado'],
+                'id'
+            ],
+            where: sequelize.where(
+                sequelize.fn('pgp_sym_decrypt', sequelize.col('numero_bi_enc'), process.env.MinhaChave),
+                numeroBI
+            )
+        });
+
+        if (!bilheteVerify) {
+            return res.status(404).json({ message: 'Número BI não encontrado' });
+        }
+
+        const guardarBI = bilheteVerify.get('numero_bi_decriptografado');
+        const bilheteId = bilheteVerify.id;
+
+        // 2. (OPCIONAL) Se quiser que exista um perfil CNE, mas não obrigatório:
+        //    Busca na tabela perfil_oficial_cne, mas se não existir, cria automaticamente.
+        let perfilCNE = await perfil_oficial_cne.findOne({ where: { numero_bi: numeroBI } });
+        if (!perfilCNE) {
+            // Cria um perfil CNE padrão para este BI (id_perfil = 2)
+            perfilCNE = await perfil_oficial_cne.create({
+                numero_bi: numeroBI,
+                id_perfil: perfilNumber
+            });
+            console.log(`Perfil CNE criado automaticamente para o BI ${numeroBI}`);
+        }
+
+        // 3. Guarda informações na sessão
+        req.session.bi = bilheteId;
+        req.session.biNumber = guardarBI;
+        req.session.perfilNumber = perfilNumber;
+
+        return res.status(200).json({
+            message: 'Bilhete validado com sucesso',
+            perfil: perfilCNE
+        });
+
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Erro ao buscar os perfis' });
     }
+}
 
 
     async validarKYC(req, res){

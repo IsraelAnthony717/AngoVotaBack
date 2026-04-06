@@ -1,17 +1,14 @@
-const models = require('../models');
-console.log('models:', models); // veja o que aparece no terminal do backend
-const Candidato = models.candidatos || models.Candidato; // tenta ambas as formas
-console.log('Candidato:', Candidato);
-
+const db = require('../models');
 
 module.exports = {
   // GET /candidatos
   async listar(req, res) {
     try {
-      const candidatos = await Candidato.findAll();
+      // Usa o modelo candidatos (definido no arquivo candidatos.js)
+      const candidatos = await db.candidatos.findAll();
       return res.json(candidatos);
     } catch (error) {
-      console.error(error);
+      console.error('Erro ao listar candidatos:', error);
       return res.status(500).json({ erro: 'Erro ao listar candidatos' });
     }
   },
@@ -20,7 +17,7 @@ module.exports = {
   async buscarPorId(req, res) {
     try {
       const { id } = req.params;
-      const candidato = await Candidato.findByPk(id);
+      const candidato = await db.candidatos.findByPk(id);
       if (!candidato) {
         return res.status(404).json({ erro: 'Candidato não encontrado' });
       }
@@ -34,9 +31,8 @@ module.exports = {
   // POST /candidatos
   async criar(req, res) {
     try {
-      // Extrai apenas os campos permitidos (evita injeção de campos não desejados)
       const { nome, idade, descricao, partido, abrevpartido, cor, foto } = req.body;
-      const novoCandidato = await Candidato.create({
+      const novoCandidato = await db.candidatos.create({
         nome,
         idade,
         descricao,
@@ -44,7 +40,7 @@ module.exports = {
         abrevpartido,
         cor,
         foto
-        // slogan e backgroundurl podem ser ignorados ou receber valores padrão
+        // total_votos começa com 0 por padrão
       });
       return res.status(201).json(novoCandidato);
     } catch (error) {
@@ -59,12 +55,11 @@ module.exports = {
       const { id } = req.params;
       const { nome, idade, descricao, partido, abrevpartido, cor, foto } = req.body;
 
-      const candidato = await Candidato.findByPk(id);
+      const candidato = await db.candidatos.findByPk(id);
       if (!candidato) {
         return res.status(404).json({ erro: 'Candidato não encontrado' });
       }
 
-      // Atualiza apenas os campos enviados
       await candidato.update({
         nome: nome !== undefined ? nome : candidato.nome,
         idade: idade !== undefined ? idade : candidato.idade,
@@ -86,12 +81,12 @@ module.exports = {
   async deletar(req, res) {
     try {
       const { id } = req.params;
-      const candidato = await Candidato.findByPk(id);
+      const candidato = await db.candidatos.findByPk(id);
       if (!candidato) {
         return res.status(404).json({ erro: 'Candidato não encontrado' });
       }
       await candidato.destroy();
-      return res.status(204).send(); // sem conteúdo
+      return res.status(204).send();
     } catch (error) {
       console.error(error);
       return res.status(500).json({ erro: 'Erro ao deletar candidato' });
@@ -106,15 +101,16 @@ module.exports = {
         return res.status(400).json({ erro: 'candidato_id é obrigatório' });
       }
 
-      const candidato = await Candidato.findByPk(candidato_id);
+      const candidato = await db.candidatos.findByPk(candidato_id);
       if (!candidato) {
         return res.status(404).json({ erro: 'Candidato não encontrado' });
       }
 
-      candidato.votos += 1;
+      // Incrementa o campo total_votos (definido no modelo)
+      candidato.total_votos += 1;
       await candidato.save();
 
-      return res.json({ message: 'Voto registrado com sucesso', votos: candidato.votos });
+      return res.json({ message: 'Voto registrado com sucesso', votos: candidato.total_votos });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ erro: 'Erro ao registrar voto' });
