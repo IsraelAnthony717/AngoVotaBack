@@ -148,7 +148,8 @@ routes.get('/perguntar-ao-gemini', async (req, res)=>{
 });
 
 
-
+const documentoController = require('./controllers/documentoController');
+routes.post('/validar-documento', documentoController.validarDocumento);
 
 
 
