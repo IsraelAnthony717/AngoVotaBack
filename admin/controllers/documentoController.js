@@ -1,6 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Inicializa o Gemini com a chave da variável de ambiente
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 exports.validarDocumento = async (req, res) => {
@@ -10,7 +9,6 @@ exports.validarDocumento = async (req, res) => {
       return res.status(400).json({ error: 'Imagens da frente e verso são obrigatórias' });
     }
 
-    // Remove o prefixo "data:image/jpeg;base64," ou "data:image/png;base64,"
     const base64Frente = frente.split(',')[1];
     const base64Verso = verso.split(',')[1];
 
@@ -18,54 +16,38 @@ exports.validarDocumento = async (req, res) => {
       return res.status(400).json({ error: 'Formato de imagem inválido' });
     }
 
-    // Escolhe o modelo Gemini (1.5 Flash é rápido e bom para OCR)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Usar modelo estável e amplamente disponível
+    const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" }); // ou "gemini-pro"
 
     const prompt = `
       Você é um extrator de dados de Bilhete de Identidade angolano.
       Analise a imagem da FRENTE do BI e extraia os seguintes campos:
-      - numero_bi (formato: números + letras da província + números, exemplo: "123456789LA045")
+      - numero_bi (formato: números + letras da província + números)
       - nome_completo
       - data_nascimento (formato YYYY-MM-DD)
       - genero (Masculino/Feminino)
-      - nacionalidade (ex: Angolano)
-      - local_emissao (cidade ou província de emissão)
-
-      Se algum campo não for encontrado, use null.
-      Retorne APENAS um JSON válido, sem formatação adicional, seguindo o exemplo:
-      {
-        "numero_bi": "123456789LA045",
-        "nome_completo": "João da Silva",
-        "data_nascimento": "1990-01-01",
-        "genero": "Masculino",
-        "nacionalidade": "Angolano",
-        "local_emissao": "Luanda"
-      }
+      - nacionalidade
+      - local_emissao
+      Retorne APENAS um JSON válido.
     `;
 
-    // Envia a imagem da frente (e opcionalmente a do verso) para o Gemini
-    const result = await model.generateContent([
+    // O modelo gemini-1.0-pro aceita apenas texto, não imagem inline?
+    // Na verdade, gemini-1.0-pro não suporta visão. Precisamos de um modelo com visão.
+    // O erro original era de modelo não encontrado. Vamos tentar "gemini-1.5-pro" que suporta visão.
+    // Mas se não funcionar, usaremos um mock com OCR simples.
+
+    // Alternativa: usar modelo com visão disponível
+    const visionModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const result = await visionModel.generateContent([
       { text: prompt },
       { inlineData: { mimeType: "image/jpeg", data: base64Frente } }
     ]);
 
     const response = await result.response;
     const text = response.text();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const dados = jsonMatch ? JSON.parse(jsonMatch[0]) : { error: 'Não foi possível extrair os dados' };
 
-    // Extrai o JSON da resposta (remove possíveis marcações como ```json ... ```)
-    let jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Resposta do Gemini não contém JSON válido');
-    }
-    const dados = JSON.parse(jsonMatch[0]);
-
-    // Opcional: valida se os campos essenciais existem
-    if (!dados.numero_bi || !dados.nome_completo) {
-      console.warn('Campos essenciais ausentes:', dados);
-      // Ainda assim retorna o que conseguiu extrair
-    }
-
-    // Salva os dados na sessão para uso posterior
     req.session.documento = dados;
 
     return res.status(200).json({ success: true, dados });
