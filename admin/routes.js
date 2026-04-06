@@ -164,4 +164,18 @@ routes.get('/health-db', async (req, res) => {
 
 
 
+routes.get('/rotas', (req, res) => {
+  const rotas = [];
+  routes.stack.forEach(layer => {
+    if (layer.route) {
+      rotas.push({
+        path: layer.route.path,
+        methods: Object.keys(layer.route.methods)
+      });
+    }
+  });
+  res.json(rotas);
+});
+
+
 module.exports = routes;
