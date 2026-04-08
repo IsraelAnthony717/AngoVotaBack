@@ -1,7 +1,5 @@
-require('dotenv').config();
 const fs = require('fs');
 const sharp = require('sharp');
-const fetch = globalThis.fetch || ((...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args)));
 
 class ModeloGemini {
 
@@ -10,9 +8,6 @@ class ModeloGemini {
     }
 
     async VerificarBI(caminhoImagem) {
-        if (!this.apiKey) {
-            throw new Error('KeyMISTRAL não encontrada. Defina KeyMISTRAL no .env');
-        }
         try {
             // Reduz a imagem antes de enviar
             const imagemReduzida = await sharp(caminhoImagem)
@@ -23,51 +18,52 @@ class ModeloGemini {
             const imagem = imagemReduzida.toString("base64");
             const tipo = "image/jpeg";
 
-       const prompt = `És um especialista em documentos de identidade angolanos. Analisa esta imagem com rigor.
+            const prompt = `És um especialista em documentos de identidade angolanos. Analisa esta imagem com rigor.
 
-                O ÚNICO DOCUMENTO ACEITE É O BILHETE DE IDENTIDADE (BI) ANGOLANO — FRENTE OU VERSO.
+O ÚNICO DOCUMENTO ACEITE É O BILHETE DE IDENTIDADE (BI) ANGOLANO — FRENTE OU VERSO.
 
-                COMO IDENTIFICAR A FRENTE DO BI ANGOLANO:
-                - Tem escrito "REPÚBLICA DE ANGOLA" e "BILHETE DE IDENTIDADE DE CIDADÃO NACIONAL"
-                - Tem o brasão oficial da República de Angola
-                - Campos: Nome Completo, Filiação, Número do BI
-                - Número no formato: 000000000XX000 (ex: 009067383LA000)
+COMO IDENTIFICAR A FRENTE DO BI ANGOLANO:
+- Tem escrito "REPÚBLICA DE ANGOLA" e "BILHETE DE IDENTIDADE DE CIDADÃO NACIONAL"
+- Tem o brasão oficial da República de Angola
+- Campos: Nome Completo, Filiação, Número do BI
+- Número no formato: 000000000XX000 (ex: 009067383LA000)
 
-                COMO IDENTIFICAR O VERSO DO BI ANGOLANO:
-                - Tem escrito "DIRECTOR NACIONAL DE IDENTIFICAÇÃO"
-                - Campos: Residência, Natural de, Província, Data de Nascimento, Sexo, Altura, Estado Civil, Emitido em, Válido até
-                - Tem impressão digital, QR code e código de barras
-                - Fundo com cor esverdeada/amarelada clara
+COMO IDENTIFICAR O VERSO DO BI ANGOLANO:
+- Tem escrito "DIRECTOR NACIONAL DE IDENTIFICAÇÃO"
+- Campos: Residência, Natural de, Província, Data de Nascimento, Sexo, Altura, Estado Civil, Emitido em, Válido até
+- Tem impressão digital, QR code e código de barras
+- Fundo com cor esverdeada/amarelada clara
 
-                REJEITA IMEDIATAMENTE qualquer outro documento:
-                - Carteira profissional (jornalista, médico, advogado, etc.)
-                - Carta de condução, passaporte, cartão de eleitor
-                - Documentos estrangeiros
-                - Crachás ou credenciais profissionais
+REJEITA IMEDIATAMENTE qualquer outro documento:
+- Carteira profissional (jornalista, médico, advogado, etc.)
+- Carta de condução, passaporte, cartão de eleitor
+- Documentos estrangeiros
+- Crachás ou credenciais profissionais
 
-                BI ORIGINAL (aceitar):
-                - Tem CORES visíveis mesmo que fracas
-                - Um único documento na imagem
-                - Fundo real atrás do cartão (mão, mesa, tecido, etc.)
+BI ORIGINAL (aceitar):
+- Tem CORES visíveis mesmo que fracas
+- Um único documento na imagem
+- Fundo real atrás do cartão (mão, mesa, tecido, etc.)
 
-                FOTOCÓPIA (rejeitar):
-                - Imagem completamente a PRETO E BRANCO sem nenhuma cor
-                - Fundo branco de papel de impressora
-                - Frente E verso na mesma imagem juntos
-                - Manchas ou grão típico de impressora
+FOTOCÓPIA (rejeitar):
+- Imagem completamente a PRETO E BRANCO sem nenhuma cor
+- Fundo branco de papel de impressora
+- Frente E verso na mesma imagem juntos
+- Manchas ou grão típico de impressora
 
-                ATENÇÃO: Baixa qualidade de câmera NÃO é fotocópia. Ausência TOTAL de cor = fotocópia sempre.
+ATENÇÃO: Baixa qualidade de câmera NÃO é fotocópia. Ausência TOTAL de cor = fotocópia sempre.
 
-                Responde APENAS com JSON válido, sem markdown, sem texto extra:
-                {
-                "e_bi_Angolano": true/false,
-                "face": "frente/verso/indefinido",
-                "foto_copia": true/false,
-                "e_original": true/false,
-                "motivo": "Explicação curta e objetiva",
-                "confianca": "alta/media/baixa",
-                "numero_bi": "número extraído ou null"
-                }`;
+Responde APENAS com JSON válido, sem markdown, sem texto extra:
+{
+  "e_bi_Angolano": true/false,
+  "face": "frente/verso/indefinido",
+  "foto_copia": true/false,
+  "e_original": true/false,
+  "motivo": "Explicação curta e objetiva",
+  "confianca": "alta/media/baixa",
+  "numero_bi": "número extraído ou null"
+}`;
+
             const resposta = await fetch("https://api.mistral.ai/v1/chat/completions", {
                 method: "POST",
                 headers: {
@@ -129,7 +125,6 @@ class ModeloGemini {
         console.log(JSON.stringify(resultado, null, 2));
 
         if (resultado.e_bi_Angolano && !resultado.foto_copia) {
-
             console.log("\n BI verificado", resultado.numero_bi);
         } else {
             console.log("\n BI recusado", resultado.motivo);

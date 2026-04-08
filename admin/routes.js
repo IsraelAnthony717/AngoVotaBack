@@ -151,6 +151,9 @@ routes.get('/perguntar-ao-gemini', async (req, res)=>{
 const documentoController = require('./controllers/documentoController');
 routes.post('/validar-documento', documentoController.validarDocumento);
 
+const mistralController = require('./controllers/mistralController');
+routes.post('/validar-documento', mistralController.validarDocumento);
+
 
 
 routes.get('/health-db', async (req, res) => {
